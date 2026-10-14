@@ -5,85 +5,77 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public class MusicManager {
     private final List<Track> tracks = new ArrayList<>();
-    private int errorCount = 0;
+    private final List<String> errors = new ArrayList<>();
 
     public void loadFromCsv(String filePath) {
         tracks.clear();
-        errorCount = 0;
+        errors.clear();
+        int lineNumber = 0;
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8))) {
             String line;
             while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                
-                String[] parts = line.split(";");
-                if (parts.length < 5) {
-                    errorCount++;
-                    continue;
-                }
-
+                lineNumber++;
                 try {
-                    String artist = parts[0].trim();
-                    String title = parts[1].trim();
-                    String album = parts[2].trim();
-                    int duration = Integer.parseInt(parts[3].trim());
-                    String genre = parts[4].trim();
-
-                    if (duration <= 0) {
-                        errorCount++;
-                        continue;
-                    }
-
-                    tracks.add(new Track(artist, title, album, duration, genre));
-                } catch (NumberFormatException e) {
-                    errorCount++;
+                    Track track = Track.fromCsv(line);
+                    tracks.add(track);
+                } catch (IllegalArgumentException exception) {
+                    errors.add("Рядок %d: %s".formatted(lineNumber, exception.getMessage()));
                 }
             }
         } catch (IOException e) {
-            System.err.println("Помилка читання файлу: " + e.getMessage());
+            System.err.println("Помилка зчитання файлу: " + e.getMessage());
         }
     }
 
     public List<Track> getTracks() {
-        return tracks;
+        return new ArrayList<>(tracks);
     }
 
-    public int getErrorCount() {
-        return errorCount;
+    public List<String> getErrors() {
+        return new ArrayList<>(errors);
     }
 
-    public int getTotalDuration() {
-        return tracks.stream().mapToInt(Track::durationInSeconds).sum();
-    }
+    public DurationGenre getSummary() {
+        int count = tracks.size();
+        int totalDuration = tracks.stream().mapToInt(Track::getDurationSeconds).sum();
+        double averageDuration = tracks.stream().mapToInt(Track::getDurationSeconds).average().orElse(0.0);
+        int maxDuration = tracks.stream().mapToInt(Track::getDurationSeconds).max().orElse(0);
 
-    public double getAverageDuration() {
-        return tracks.isEmpty() ? 0 : (double) getTotalDuration() / tracks.size();
+        return new DurationGenre(count, totalDuration, averageDuration, maxDuration);
     }
 
     public Track getLongestTrack() {
         return tracks.stream()
-                .max((t1, t2) -> Integer.compare(t1.durationInSeconds(), t2.durationInSeconds()))
+                .max(Comparator.comparingInt(Track::getDurationSeconds))
                 .orElse(null);
     }
 
     public void printReport() {
-        System.out.println("=== ЗВІТ ОБРОБКИ МУЗИЧНОЇ БІБЛІОТЕКИ ===");
-        System.out.println("Успішно зчитано треків: " + tracks.size());
-        System.out.println("Записів із помилками: " + errorCount);
-        System.out.println("----------------------------------------");
-        
-        if (!tracks.isEmpty()) {
-            System.out.println("Список треків:");
-            tracks.forEach(t -> System.out.println(" - " + t));
-            System.out.println("----------------------------------------");
-            System.out.println("Загальна тривалість: " + getTotalDuration() + " сек");
-            System.out.printf("Середня тривалість: %.2f сек%n", getAverageDuration());
-            System.out.println("Найдовший трек: " + getLongestTrack());
+        System.out.println("Список треків:");
+        for (Track t : tracks) {
+            System.out.println("- " + t);
+        }
+        System.out.println("-----------------------------------");
+
+        DurationGenre summary = getSummary();
+        System.out.println("Загальна тривалість: " + summary.totalDuration() + " сек");
+        System.out.printf(Locale.ROOT, "Середня тривалість: %.2f сек%n", summary.averageDuration());
+
+        Track longest = getLongestTrack();
+        if (longest != null) {
+            System.out.println("Найдовший трек: " + longest);
+        }
+
+        if (!errors.isEmpty()) {
+            System.out.println("Помилок: " + errors.size());
+            errors.forEach(System.out::println);
         }
     }
 }
-
