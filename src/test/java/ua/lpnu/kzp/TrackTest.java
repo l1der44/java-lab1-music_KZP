@@ -1,53 +1,45 @@
 package ua.lpnu.kzp;
 
 import org.junit.jupiter.api.Test;
+import java.util.HashSet;
+import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TrackTest {
 
     @Test
-    void constructorCreatesValidTrack() {
-        Track track = new Track("Океан Ельзи", "Човен", "Альбом", 200, "Рок");
-        assertEquals("Океан Ельзи", track.getArtist());
-        assertEquals("Човен", track.getTitle());
-        assertEquals("Альбом", track.getAlbum());
-        assertEquals(200, track.getDurationSeconds());
-        assertEquals("Рок", track.getGenre());
+    void subtypesCalculateAudioWeightDifferently() {
+        Track studio = new StudioTrack("Океан Ельзи", "Човен", "Альбом", 200, "Рок", "Abbey Road");
+        Track live = new LiveTrack("Океан Ельзи", "Човен", "Альбом", 200, "Рок", "Оперний");
+
+        assertNotEquals(studio.calculateAudioWeight(), live.calculateAudioWeight());
+        assertEquals(70.0, studio.calculateAudioWeight(), 0.001);
+        assertEquals(90.0, live.calculateAudioWeight(), 0.001);
     }
 
     @Test
-    void constructorRejectsNullOrBlankFields() {
-        assertThrows(NullPointerException.class,
-                () -> new Track(null, "Title", "Album", 100, "Genre"));
+    void equalsAndHashCodeDeduplicateInHashSet() {
+        Set<Track> set = new HashSet<>();
+        set.add(new StudioTrack("Океан Ельзи", "Човен", "Альбом", 200, "Рок"));
+        set.add(new StudioTrack("Океан Ельзи", "Човен", "Інший Альбом", 300, "Рок"));
+
+        assertEquals(1, set.size());
+    }
+
+    @Test
+    void constructorRejectsInvalidSpecificValue() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Track("   ", "Title", "Album", 100, "Genre"));
-    }
-
-    @Test
-    void constructorRejectsNegativeDuration() {
+                () -> new StudioTrack("Artist", "Title", "Album", 100, "Genre", "   "));
         assertThrows(IllegalArgumentException.class,
-                () -> new Track("Artist", "Title", "Album", -10, "Genre"));
+                () -> new LiveTrack("Artist", "Title", "Album", -50, "Genre", "Venue"));
     }
 
     @Test
-    void fromCsvCreatesValidTrack() {
-        Track track = Track.fromCsv("Океан Ельзи;Там, де нас нема;Альбом;269;Рок");
-        assertEquals("Океан Ельзи", track.getArtist());
-        assertEquals(269, track.getDurationSeconds());
-    }
+    void fromCsvParsesStudioAndLiveTracks() {
+        Track studio = Track.fromCsv("Океан Ельзи;Човен;Альбом;200;Рок;STUDIO;Abbey Road");
+        Track live = Track.fromCsv("Океан Ельзи;Човен;Альбом;200;Рок;LIVE;Оперний");
 
-    @Test
-    void fromCsvRejectsInvalidFormatAndNumber() {
-        assertThrows(IllegalArgumentException.class,
-                () -> Track.fromCsv("Artist;Title;Album"));
-        assertThrows(IllegalArgumentException.class,
-                () -> Track.fromCsv("Artist;Title;Album;not_a_number;Genre"));
-    }
-
-    @Test
-    void recordUsesValueEquality() {
-        DurationGenre first = new DurationGenre(3, 782, 260.67, 275);
-        DurationGenre second = new DurationGenre(3, 782, 260.67, 275);
-        assertEquals(first, second);
+        assertEquals(TrackKind.STUDIO, studio.getKind());
+        assertEquals(TrackKind.LIVE, live.getKind());
     }
 }

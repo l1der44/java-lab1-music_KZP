@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class MusicManager {
     private final List<Track> tracks = new ArrayList<>();
@@ -34,13 +36,8 @@ public class MusicManager {
         }
     }
 
-    public List<Track> getTracks() {
-        return new ArrayList<>(tracks);
-    }
-
-    public List<String> getErrors() {
-        return new ArrayList<>(errors);
-    }
+    public List<Track> getTracks() { return new ArrayList<>(tracks); }
+    public List<String> getErrors() { return new ArrayList<>(errors); }
 
     public DurationGenre getSummary() {
         int count = tracks.size();
@@ -58,15 +55,21 @@ public class MusicManager {
     }
 
     public void printReport() {
-        System.out.println("Список треків:");
+        System.out.println("Список треків (Поліморфна обробка):");
+        double totalWeight = 0.0;
         for (Track t : tracks) {
             System.out.println("- " + t);
+            totalWeight += t.calculateAudioWeight(); // Виклик поліморфного методу
         }
         System.out.println("-----------------------------------");
 
         DurationGenre summary = getSummary();
         System.out.println("Загальна тривалість: " + summary.totalDuration() + " сек");
         System.out.printf(Locale.ROOT, "Середня тривалість: %.2f сек%n", summary.averageDuration());
+        System.out.printf(Locale.ROOT, "Загальна вага фонотеки: %.2f МБ%n", totalWeight);
+
+        Set<Track> uniqueTracks = new HashSet<>(tracks);
+        System.out.println("Унікальних треків у HashSet: " + uniqueTracks.size());
 
         Track longest = getLongestTrack();
         if (longest != null) {
