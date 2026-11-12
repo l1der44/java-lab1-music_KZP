@@ -1,15 +1,18 @@
-﻿package ua.lpnu.kzp;
+package ua.lpnu.kzp;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
+import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class MusicManager {
     private final List<Track> tracks = new ArrayList<>();
@@ -36,48 +39,81 @@ public class MusicManager {
         }
     }
 
-    public List<Track> getTracks() { return new ArrayList<>(tracks); }
-    public List<String> getErrors() { return new ArrayList<>(errors); }
+    public List<Track> getTracks() {
+        return List.copyOf(tracks);
+    }
+
+    public List<String> getErrors() {
+        return List.copyOf(errors);
+    }
 
     public DurationGenre getSummary() {
-        int count = tracks.size();
-        int totalDuration = tracks.stream().mapToInt(Track::getDurationSeconds).sum();
-        double averageDuration = tracks.stream().mapToInt(Track::getDurationSeconds).average().orElse(0.0);
-        int maxDuration = tracks.stream().mapToInt(Track::getDurationSeconds).max().orElse(0);
-
-        return new DurationGenre(count, totalDuration, averageDuration, maxDuration);
+        IntSummaryStatistics stats = MusicReport.durationStatistics(tracks);
+        int maxDuration = stats.getCount() == 0 ? 0 : stats.getMax();
+        return new DurationGenre(
+                (int) stats.getCount(),
+                (int) stats.getSum(),
+                stats.getAverage(),
+                maxDuration
+        );
     }
 
     public Track getLongestTrack() {
-        return tracks.stream()
-                .max(Comparator.comparingInt(Track::getDurationSeconds))
+        return MusicReport.topTracksByDuration(tracks, 1)
+                .stream()
+                .findFirst()
                 .orElse(null);
     }
 
     public void printReport() {
         System.out.println("Список треків (Поліморфна обробка):");
-        double totalWeight = 0.0;
-        for (Track t : tracks) {
-            System.out.println("- " + t);
-            totalWeight += t.calculateAudioWeight(); // Виклик поліморфного методу
-        }
-        System.out.println("-----------------------------------");
+        tracks.forEach(t -> System.out.println("- " + t));
+        double totalWeight = tracks.stream()
+                .mapToDouble(Track::calculateAudioWeight)
+                .sum();
 
-        DurationGenre summary = getSummary();
-        System.out.println("Загальна тривалість: " + summary.totalDuration() + " сек");
-        System.out.printf(Locale.ROOT, "Середня тривалість: %.2f сек%n", summary.averageDuration());
+        System.out.println("-----------------------------------");
+        IntSummaryStatistics stats = MusicReport.durationStatistics(tracks);
+        if (stats.getCount() == 0) {
+            System.out.println("Фонотека порожня.");
+        } else {
+            System.out.println("Загальна тривалість: " + stats.getSum() + " сек");
+            System.out.printf(Locale.ROOT, "Середня тривалість: %.2f сек%n", stats.getAverage());
+            System.out.println("Мін / Макс тривалість: " + stats.getMin() + " / " + stats.getMax() + " сек");
+        }
         System.out.printf(Locale.ROOT, "Загальна вага фонотеки: %.2f МБ%n", totalWeight);
 
         Set<Track> uniqueTracks = new HashSet<>(tracks);
         System.out.println("Унікальних треків у HashSet: " + uniqueTracks.size());
 
-        Track longest = getLongestTrack();
-        if (longest != null) {
-            System.out.println("Найдовший трек: " + longest);
-        }
+        System.out.println("-----------------------------------");
+        System.out.println("Результати запитів Stream API (Варіант 13):");
+
+        List<Track> longTracks = MusicReport.filterLongerThan180(tracks);
+        System.out.println("1. Треки > 180 с (" + longTracks.size() + " шт.): "
+                + MusicReport.getTrackTitles(longTracks));
+
+        System.out.println("2. Усі назви (map): " + MusicReport.getTrackTitles(tracks));
+
+        Map<String, Integer> byArtist = MusicReport.totalDurationByArtist(tracks);
+        String groupedStr = byArtist.entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue() + " с")
+                .collect(Collectors.joining(", ", "{", "}"));
+        System.out.println("3. Сумарна тривалість за виконавцем: " + groupedStr);
+
+        List<Track> top5 = MusicReport.topTracksByDuration(tracks, 5);
+        System.out.println("4. Top-5 найдовших треків:");
+        top5.forEach(t -> System.out.println("   * " + t.getTitle() + " (" + t.getDurationSeconds() + " с) — " + t.getArtist()));
+
+        Optional<Track> found = MusicReport.findByTitle(tracks, "Човен");
+        System.out.println("5. Пошук 'Човен': " + found.map(Track::toString).orElse("Не знайдено"));
+
+        Optional<Track> missing = MusicReport.findByTitle(tracks, "Невідома пісня");
+        System.out.println("   Пошук 'Невідома пісня': " + missing.map(Track::toString).orElse("Не знайдено"));
 
         if (!errors.isEmpty()) {
-            System.out.println("Помилок: " + errors.size());
+            System.out.println("-----------------------------------");
+            System.out.println("Помилок зчитання: " + errors.size());
             errors.forEach(System.out::println);
         }
     }
