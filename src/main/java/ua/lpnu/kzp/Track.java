@@ -1,4 +1,4 @@
-package ua.lpnu.kzp;
+﻿package ua.lpnu.kzp;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -40,9 +40,6 @@ public abstract class Track {
         this.durationSeconds = durationSeconds;
     }
 
-    /**
-     * Поліморфний метод: обчислює умовний розмір/вагу аудіофайлу у МБ.
-     */
     public abstract double calculateAudioWeight();
 
     public String getArtist() { return artist; }
