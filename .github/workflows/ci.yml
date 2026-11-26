@@ -1,4 +1,4 @@
-﻿name: KZP Full Pipeline CI (Java + Python)
+name: KZP Full Pipeline CI (Java + Python)
 
 on:
   push:

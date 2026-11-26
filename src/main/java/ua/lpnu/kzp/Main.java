@@ -1,4 +1,4 @@
-﻿package ua.lpnu.kzp;
+package ua.lpnu.kzp;
 
 
 import java.nio.file.Files;
