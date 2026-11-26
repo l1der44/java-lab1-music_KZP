@@ -23,7 +23,7 @@ def _normalize_row(raw_row: dict[str, str | None], is_ua: bool) -> dict[str, str
 def _require_text(row: dict[str, str | None], field: str, row_number: int) -> str:
     raw = row.get(field)
     if raw is None or not raw.strip():
-        raise DataError(f"Рядок {row_number}: відсутнє або порожнє поле {field}")
+        raise DataError(f"Рядок {row_number}: відсутнє значення поля {field}")
     return raw.strip()
 
 
@@ -34,7 +34,7 @@ def _parse_duration(row: dict[str, str | None], row_number: int) -> int:
     except ValueError as error:
         raise DataError(f"Рядок {row_number}: поле duration має бути цілим числом") from error
     if duration <= 0:
-        raise DataError(f"Рядок {row_number}: поле duration має бути > 0")
+        raise DataError(f"Рядок {row_number}: поле duration має бути більшим за 0")
     return duration
 
 
