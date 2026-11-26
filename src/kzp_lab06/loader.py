@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 from pathlib import Path
 
 from .errors import DataError
@@ -73,5 +73,6 @@ def load_tracks(path: Path) -> list[dict[str, object]]:
             return tracks
     except OSError as error:
         raise DataError(f"Не вдалося прочитати файл: {path}") from error
+
 
 load_records = load_tracks

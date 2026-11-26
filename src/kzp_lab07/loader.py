@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 from pathlib import Path
 
 from .errors import DataError
