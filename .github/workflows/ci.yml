@@ -1,0 +1,47 @@
+﻿name: KZP Full Pipeline CI (Java + Python)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e ".[dev]"
+
+      - name: Run Java JUnit tests
+        run: mvn -B test
+
+      - name: Run Ruff linter and formatter check
+        run: |
+          .venv/bin/ruff check
+          .venv/bin/ruff format --check
+
+      - name: Run Python pytest suite
+        run: .venv/bin/pytest -v
+
+      - name: Run end-to-end Main.java integration pipeline
+        run: mvn -B compile exec:java -Dexec.mainClass="ua.lpnu.kzp.Main"
