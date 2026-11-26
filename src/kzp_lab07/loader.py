@@ -82,14 +82,19 @@ def load_tracks(path: Path) -> list[Track]:
             if ";" in first_line and "," not in first_line.split(";")[0]:
                 raw_reader = csv.reader(source, delimiter=";")
                 tracks: list[Track] = []
+                seen: set[tuple[str, str, str, int, str]] = set()
                 for row_number, values in enumerate(raw_reader, start=1):
                     if not any(cell.strip() for cell in values) or len(values) < 5:
                         continue
                     row = dict(zip(DEFAULT_FIELDS, values, strict=False))
                     try:
-                        tracks.append(_build_track(row, row_number))
+                        track = _build_track(row, row_number)
                     except DataError:
                         continue
+                    key = (track.performer, track.title, track.album, track.duration, track.genre)
+                    if key not in seen:
+                        seen.add(key)
+                        tracks.append(track)
                 return tracks
 
             reader = csv.DictReader(source)
