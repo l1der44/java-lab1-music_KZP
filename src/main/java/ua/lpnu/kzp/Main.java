@@ -1,4 +1,4 @@
-package ua.lpnu.kzp;
+﻿package ua.lpnu.kzp;
 
 
 import java.nio.file.Files;
@@ -47,10 +47,42 @@ public class Main {
             System.out.println("Пошук за предикатом (жанр ROCK): " + repository.find(r -> r.getGenre() == TrackGenre.ROCK).size() + " шт.");
             System.out.println("CSV-заголовок: " + String.join(",", rows.get(0)));
             System.out.println("Приклад екранованого рядка: " + csvText.lines().skip(1).findFirst().orElse(""));
-            System.out.println("Відновлено з CSV: " + restored.size() + " об'єктів");
+                        System.out.println("Відновлено з CSV: " + restored.size() + " об'єктів");
+
+            runPythonModule("kzp_lab06.cli", exportPath.toString(), "reports/lab06_summary.txt");
+            runPythonModule("kzp_lab07.cli", exportPath.toString(), "reports/lab07_summary.txt");
+            System.out.println("\n--- Звіт ЛР 6 (reports/lab06_summary.txt) ---");
+            System.out.println(Files.readString(Path.of("reports", "lab06_summary.txt"), StandardCharsets.UTF_8));
+            System.out.println("--- Звіт ЛР 7 (reports/lab07_summary.txt) ---");
+            System.out.println(Files.readString(Path.of("reports", "lab07_summary.txt"), StandardCharsets.UTF_8));
             System.out.println("Round-trip рівність (original.equals(restored)): " + repository.all().equals(restored));
         } catch (Exception e) {
             System.err.println("Помилка CSV-експорту/імпорту: " + e.getMessage());
         }
+    }
+
+    private static void runPythonModule(String moduleName, String inputCsv, String outputReport)
+            throws Exception {
+        String pythonExec = resolvePythonExecutable();
+        ProcessBuilder pb = new ProcessBuilder(pythonExec, "-m", moduleName, inputCsv, outputReport);
+        pb.environment().put("PYTHONPATH", "src");
+        pb.environment().put("PYTHONUTF8", "1");
+        pb.inheritIO();
+        int exitCode = pb.start().waitFor();
+        if (exitCode != 0) {
+            throw new IllegalStateException("Модуль " + moduleName + " завершився з кодом " + exitCode);
+        }
+    }
+
+    private static String resolvePythonExecutable() {
+        Path winVenv = Path.of(".venv", "Scripts", "python.exe");
+        if (Files.exists(winVenv)) {
+            return winVenv.toString();
+        }
+        Path unixVenv = Path.of(".venv", "bin", "python");
+        if (Files.exists(unixVenv)) {
+            return unixVenv.toString();
+        }
+        return "python";
     }
 }
