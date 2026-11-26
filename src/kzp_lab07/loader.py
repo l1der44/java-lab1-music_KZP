@@ -6,7 +6,7 @@ from .models import LiveTrack, StudioTrack, Track
 
 REQUIRED_EN = {"performer", "title", "album", "duration", "genre"}
 REQUIRED_UA = {"виконавець", "назва", "альбом", "тривалість", "жанр"}
-OPTIONAL_COLS = {"kind", "extra"}
+DEFAULT_FIELDS = ["performer", "title", "album", "duration", "genre", "kind", "extra"]
 UA_TO_EN = {
     "виконавець": "performer",
     "назва": "title",
@@ -42,56 +42,76 @@ def _parse_duration(row: dict[str, str | None], row_number: int) -> int:
     return duration
 
 
+def _build_track(row: dict[str, str | None], row_number: int) -> Track:
+    performer = _require_text(row, "performer", row_number)
+    title = _require_text(row, "title", row_number)
+    album = _require_text(row, "album", row_number)
+    duration = _parse_duration(row, row_number)
+    genre = _require_text(row, "genre", row_number).upper()
+    kind = (row.get("kind") or "STUDIO").strip().upper()
+    extra = (row.get("extra") or "").strip()
+
+    try:
+        if kind == "LIVE":
+            return (
+                LiveTrack(performer, title, album, duration, genre, venue=extra)
+                if extra
+                else LiveTrack(performer, title, album, duration, genre)
+            )
+        if kind in ("", "STUDIO"):
+            return (
+                StudioTrack(performer, title, album, duration, genre, studio=extra)
+                if extra
+                else StudioTrack(performer, title, album, duration, genre)
+            )
+        raise DataError(f"Рядок {row_number}: невідомий тип треку {kind}")
+    except ValueError as error:
+        raise DataError(f"Рядок {row_number}: {error}") from error
+
+
 def load_tracks(path: Path) -> list[Track]:
     try:
         with path.open("r", encoding="utf-8", newline="") as source:
+            first_line = source.readline()
+            if not first_line:
+                raise DataError(
+                    "Некоректний заголовок: потрібні performer, title, album, duration, genre"
+                )
+            source.seek(0)
+
+            if ";" in first_line and "," not in first_line.split(";")[0]:
+                raw_reader = csv.reader(source, delimiter=";")
+                tracks: list[Track] = []
+                for row_number, values in enumerate(raw_reader, start=1):
+                    if not any(cell.strip() for cell in values):
+                        continue
+                    if len(values) < 5:
+                        raise DataError(f"Рядок {row_number}: недостатньо полів")
+                    row = dict(zip(DEFAULT_FIELDS, values, strict=False))
+                    tracks.append(_build_track(row, row_number))
+                return tracks
+
             reader = csv.DictReader(source)
             if reader.fieldnames is None:
                 raise DataError(
                     "Некоректний заголовок: потрібні performer, title, album, duration, genre"
                 )
             header = set(reader.fieldnames)
-            if REQUIRED_EN.issubset(header) and header.issubset(REQUIRED_EN | OPTIONAL_COLS):
+            if REQUIRED_EN.issubset(header):
                 is_ua = False
-            elif REQUIRED_UA.issubset(header) and header.issubset(REQUIRED_UA | OPTIONAL_COLS):
+            elif REQUIRED_UA.issubset(header):
                 is_ua = True
             else:
                 raise DataError(
                     "Некоректний заголовок: потрібні performer, title, album, duration, genre"
                 )
 
-            tracks: list[Track] = []
+            tracks = []
             for row_number, raw_row in enumerate(reader, start=2):
                 if None in raw_row:
                     raise DataError(f"Рядок {row_number}: зайві значення поза межами заголовка")
                 row = _normalize_row(raw_row, is_ua)
-                performer = _require_text(row, "performer", row_number)
-                title = _require_text(row, "title", row_number)
-                album = _require_text(row, "album", row_number)
-                duration = _parse_duration(row, row_number)
-                genre = _require_text(row, "genre", row_number).upper()
-                kind = (row.get("kind") or "STUDIO").strip().upper()
-                extra = (row.get("extra") or "").strip()
-
-                try:
-                    if kind == "LIVE":
-                        track: Track = (
-                            LiveTrack(performer, title, album, duration, genre, venue=extra)
-                            if extra
-                            else LiveTrack(performer, title, album, duration, genre)
-                        )
-                    elif kind in ("", "STUDIO"):
-                        track = (
-                            StudioTrack(performer, title, album, duration, genre, studio=extra)
-                            if extra
-                            else StudioTrack(performer, title, album, duration, genre)
-                        )
-                    else:
-                        raise DataError(f"Рядок {row_number}: невідомий тип треку {kind}")
-                except ValueError as error:
-                    raise DataError(f"Рядок {row_number}: {error}") from error
-
-                tracks.append(track)
+                tracks.append(_build_track(row, row_number))
             return tracks
     except OSError as error:
         raise DataError(f"Не вдалося прочитати файл: {path}") from error
