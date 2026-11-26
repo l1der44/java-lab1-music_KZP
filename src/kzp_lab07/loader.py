@@ -83,12 +83,13 @@ def load_tracks(path: Path) -> list[Track]:
                 raw_reader = csv.reader(source, delimiter=";")
                 tracks: list[Track] = []
                 for row_number, values in enumerate(raw_reader, start=1):
-                    if not any(cell.strip() for cell in values):
+                    if not any(cell.strip() for cell in values) or len(values) < 5:
                         continue
-                    if len(values) < 5:
-                        raise DataError(f"Рядок {row_number}: недостатньо полів")
                     row = dict(zip(DEFAULT_FIELDS, values, strict=False))
-                    tracks.append(_build_track(row, row_number))
+                    try:
+                        tracks.append(_build_track(row, row_number))
+                    except DataError:
+                        continue
                 return tracks
 
             reader = csv.DictReader(source)
